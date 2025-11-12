@@ -1,0 +1,103 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.cluster import SpectralClustering
+from sklearn.preprocessing import normalize
+import re
+
+# ========== 参数设置 ==========
+csv_path = "access_log.csv"   # 输入文件路径
+window_size = 10              # 共现窗口大小
+n_clusters = 6                # 聚类数
+save_prefix = "group_result"  # 输出文件前缀
+
+# ========== 1. 读取数据 ==========
+# 假设CSV没有标题行，手动指定列名
+col_names = [
+    "col1", "time", "graph_id", "col4", "width", "height", 
+    "col7", "operation", "col9", "col10"
+]
+df = pd.read_csv(csv_path, names=col_names, header=None)
+
+# ========== 2. 预处理时间列 ==========
+# 将时间浮点值离散化为排序索引
+df = df.sort_values("time").reset_index(drop=True)
+df["time_discrete"] = np.arange(1, len(df) + 1)
+
+# ========== 3. 提取图形编号与操作 ==========
+# 图形编号
+df["graph_id"] = df["graph_id"].astype(str)
+
+# 从operation列中提取操作名，如 “SGP_1.0.0.1_open_case_信息_点击_...” → “信息_点击”
+def extract_op_name(op_str):
+    if not isinstance(op_str, str):
+        return "unknown"
+    # 匹配下划线分隔的最后两个中文字段
+    m = re.findall(r'[_]?([\u4e00-\u9fa5]+)', op_str)
+    if len(m) >= 2:
+        return "_".join(m[-2:])  # 取最后两个中文词
+    elif len(m) == 1:
+        return m[0]
+    else:
+        return "unknown"
+
+df["op_name"] = df["operation"].apply(extract_op_name)
+
+# 计算图形面积（如果有意义）
+df["area"] = df["width"] * df["height"]
+
+print(f"读取数据 {len(df)} 条记录，共 {df['graph_id'].nunique()} 个图形。")
+
+# ========== 4. 构建共现矩阵 ==========
+graph_ids = df["graph_id"].unique()
+id_to_idx = {gid: i for i, gid in enumerate(graph_ids)}
+n_graphs = len(graph_ids)
+co_matrix = np.zeros((n_graphs, n_graphs), dtype=np.float32)
+
+# 滑动窗口统计共现
+for i in range(len(df) - window_size + 1):
+    window = df["graph_id"].iloc[i:i + window_size].values
+    unique_ids = np.unique(window)
+    for a in unique_ids:
+        for b in unique_ids:
+            if a != b:
+                co_matrix[id_to_idx[a], id_to_idx[b]] += 1
+
+# 归一化
+co_matrix = normalize(co_matrix, norm='l1', axis=1)
+
+# ========== 5. 聚类 ==========
+clustering = SpectralClustering(
+    n_clusters=n_clusters,
+    affinity='precomputed',
+    assign_labels='kmeans',
+    random_state=42
+)
+labels = clustering.fit_predict(co_matrix)
+
+# ========== 6. 排序并绘制热图 ==========
+sorted_idx = np.argsort(labels)
+sorted_matrix = co_matrix[sorted_idx][:, sorted_idx]
+sorted_labels = [graph_ids[i] for i in sorted_idx]
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(sorted_matrix, cmap='viridis', xticklabels=False, yticklabels=False)
+plt.title(f"Graph Co-occurrence Heatmap (window={window_size}, clusters={n_clusters})")
+plt.xlabel("Graph ID (sorted by cluster)")
+plt.ylabel("Graph ID (sorted by cluster)")
+plt.tight_layout()
+plt.show()
+
+# ========== 7. 保存聚类结果 ==========
+cluster_df = pd.DataFrame({
+    "graph_id": graph_ids,
+    "cluster": labels
+}).sort_values("cluster")
+
+cluster_df.to_csv(f"{save_prefix}_clusters.csv", index=False)
+print(f"\n聚类结果已保存至: {save_prefix}_clusters.csv")
+
+# 可选保存共现矩阵
+np.save(f"{save_prefix}_co_matrix.npy", co_matrix)
+print(f"共现矩阵已保存至: {save_prefix}_co_matrix.npy")
