@@ -68,12 +68,6 @@ class SequenceCNN(nn.Module):
         x = self.pool(x).squeeze(-1)
         return self.classifier(x)
 
-    def extract_features(self, x):
-        x = x.permute(0, 2, 1)
-        x = self.conv(x)
-        return self.pool(x).squeeze(-1)
-
-
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
