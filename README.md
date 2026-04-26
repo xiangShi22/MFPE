@@ -1,4 +1,4 @@
-# MFPE: a multi-perspective Fourier positional encoding for identifying enhancers
+# HelixPR: a helix-aware periodic representation of DNA sequence for enhancer identification
 
 This repository provides a simple two-stage pipeline for DNA sequence classification:
 
@@ -30,7 +30,7 @@ Recommended directory layout:
 
 ```text
 project/
-├── mfpe.py
+├── helixPR.py
 ├── train.py
 ├── data/
 │   ├── raw/
@@ -68,7 +68,7 @@ pip install numpy pandas torch biopython scikit-learn tqdm
 
 ## Step 1: Generate Embeddings
 
-Use `mfpe.py` to convert DNA sequences into MFPE embeddings.
+Use `helixPR.py` to convert DNA sequences into helixPR embeddings.
 
 ### Input format
 
@@ -77,7 +77,7 @@ The input directory should contain `.txt` files. Each file may contain multiple 
 ### Example
 
 ```bash
-python mfpe.py \
+python helixPR.py \
   --input_dir /path/to/raw/train \
   --output_dir /path/to/processed/train \
   --alpha 0.05 \
@@ -87,7 +87,7 @@ python mfpe.py \
 Run the same process for the test set:
 
 ```bash
-python mfpe.py \
+python helixPR.py \
   --input_dir /path/to/raw/test \
   --output_dir /path/to/processed/test \
   --alpha 0.05 \
@@ -122,7 +122,7 @@ python train.py \
 
 ## Arguments
 
-### `mfpe.py`
+### `helixPR.py`
 
 - `--input_dir`: directory containing FASTA `.txt` files
 - `--output_dir`: directory to save generated CSV embeddings
